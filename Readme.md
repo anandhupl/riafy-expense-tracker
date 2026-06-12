@@ -6,14 +6,14 @@ A lightweight, single-page personal expense tracker built to run locally with ze
 
 1. Ensure you have Python 3.x installed.
 2. Install the required dependency:
-   ```bash
+```bash
    pip install flask
 
 ```
 
 3. Run the application:
 ```bash
-python app.py
+   python app.py
 
 ```
 
