@@ -32,7 +32,6 @@ def handle_expenses():
     if request.method == 'POST':
         data = request.json
         
-        # THIS IS THE FIXED LINE: 
         # Using .get('title', '').strip() prevents users from submitting "   " as a title
         if not data.get('title', '').strip() or not data.get('amount') or not data.get('category'):
             return jsonify({'error': 'Missing required fields or blank title'}), 400
@@ -92,9 +91,20 @@ def handle_expense(id):
         
     if request.method == 'PUT':
         data = request.json
+        
+        # Add validation to match POST
+        if not data.get('title', '').strip() or not data.get('amount') or not data.get('category'):
+            return jsonify({'error': 'Missing required fields or blank title'}), 400
+            
+        try:
+            amount = float(data['amount'])
+            if amount <= 0: return jsonify({'error': 'Amount must be positive'}), 400
+        except ValueError:
+            return jsonify({'error': 'Invalid amount'}), 400
+            
         with get_db() as conn:
             conn.execute('UPDATE expenses SET title=?, amount=?, category=?, date=?, note=? WHERE id=?',
-                         (data['title'], float(data['amount']), data['category'], data['date'], data.get('note', ''), id))
+                         (data['title'].strip(), amount, data['category'], data['date'], data.get('note', ''), id))
             conn.commit()
         return '', 204
 

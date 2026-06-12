@@ -90,6 +90,7 @@
     <script>
         const API_URL = '/api';
         document.getElementById('exp-date').valueAsDate = new Date();
+        let currentExpenses = []; // Global state for memory
 
         // XSS Sanitization Helper
         function escapeHTML(str) {
@@ -119,11 +120,10 @@
             let start = document.getElementById('filter-start').value;
             let end = document.getElementById('filter-end').value;
 
-            // The Logic Patch: Prevent paradoxical time travel
             if (start && end && start > end) {
                 alert("Logic Error: Start date cannot be after the End date.");
-                document.getElementById('filter-end').value = ''; // Clear the invalid input
-                end = ''; // Reset for the API call
+                document.getElementById('filter-end').value = ''; 
+                end = ''; 
             }
 
             const params = new URLSearchParams({
@@ -134,6 +134,7 @@
             });
             const res = await fetch(`${API_URL}/expenses?${params}`);
             const expenses = await res.json();
+            currentExpenses = expenses; // Store the state locally
             
             const tbody = document.getElementById('expense-list');
             if(expenses.length === 0) {
@@ -147,7 +148,7 @@
                         <td><strong>₹${e.amount.toFixed(2)}</strong></td>
                         <td class="text-muted small text-break">${escapeHTML(e.note) || '-'}</td>
                         <td class="text-nowrap">
-                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editExp(${e.id}, '${escapeHTML(e.title).replace(/'/g, "\\'")}', ${e.amount}, '${escapeHTML(e.category)}', '${e.date}', '${escapeHTML(e.note || '').replace(/'/g, "\\'")}')">Edit</button>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editExp(${e.id})">Edit</button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteExp(${e.id})">Del</button>
                         </td>
                     </tr>
@@ -186,20 +187,16 @@
             loadExpenses();
         };
 
-        function editExp(id, title, amount, category, date, note) {
-            document.getElementById('exp-id').value = id;
-            
-            const decodeHTML = (html) => {
-                const txt = document.createElement('textarea');
-                txt.innerHTML = html;
-                return txt.value;
-            };
+        function editExp(id) {
+            const expense = currentExpenses.find(e => e.id === id);
+            if(!expense) return;
 
-            document.getElementById('exp-title').value = decodeHTML(title);
-            document.getElementById('exp-amount').value = amount;
-            document.getElementById('exp-category').value = decodeHTML(category);
-            document.getElementById('exp-date').value = date;
-            document.getElementById('exp-note').value = decodeHTML(note);
+            document.getElementById('exp-id').value = expense.id;
+            document.getElementById('exp-title').value = expense.title;
+            document.getElementById('exp-amount').value = expense.amount;
+            document.getElementById('exp-category').value = expense.category;
+            document.getElementById('exp-date').value = expense.date;
+            document.getElementById('exp-note').value = expense.note || '';
             
             document.getElementById('form-title').innerText = 'Edit Expense';
             document.getElementById('save-btn').innerText = 'Update Expense';
