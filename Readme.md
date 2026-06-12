@@ -5,18 +5,18 @@ A lightweight, single-page personal expense tracker built to run locally with ze
 ## How to Run
 
 1. Ensure you have Python 3.x installed.
-2. Install the required dependency:
+2. Install the required dependencies:
 ```bash
-   pip install flask
+pip install -r requirements.txt
 
 ```
 
 3. Run the application:
+
 ```bash
-   python app.py
+python app.py
 
 ```
-
 
 4. Open your browser and navigate to: `http://127.0.0.1:5000`
 
@@ -28,11 +28,16 @@ A lightweight, single-page personal expense tracker built to run locally with ze
 
 ## What's Done vs. Skipped
 
-* **Done:** End-to-end CRUD functionality, real-time filtering (by search text, date range, and category), automated current-month summary aggregation, and input validation. Sorting is handled natively by the SQL query (`ORDER BY date DESC, id DESC`).
+* **Done:** End-to-end CRUD functionality, real-time filtering (by search text, date range, and category), automated current-month summary aggregation, and input validation across both POST and PUT routes. Sorting is handled natively by the SQL query (`ORDER BY date DESC, id DESC`).
 * **Skipped:** User authentication, multi-currency support, pagination (all records load in one scrollable table), and heavy frontend frameworks. These were deprioritized to ruthlessly execute on the core logical requirements within the time limit.
 
 ## Edge Cases Handled
 
 * **Empty States:** The UI clearly indicates when no expenses match the active filters or when the monthly summary is zero.
 * **Invalid Inputs:** HTML5 form constraints prevent empty titles, unselected categories, and negative/zero amounts. The backend strips whitespace to prevent blank submissions. Added a logical check to prevent paradoxical date filtering (Start Date > End Date).
-* **String Sanitization:** Handled Javascript string escaping for UI data attributes to prevent XSS injection, and applied CSS text-breaking to prevent massive strings without spaces from destroying the table layout.
+* **XSS & String Breaks:** Handled Javascript string escaping for UI data attributes to prevent XSS injection, and applied CSS text-breaking to prevent massive strings without spaces from destroying the table layout.
+
+## Known Rough Edges
+
+* **Frontend State Management:** To avoid fragile inline Javascript string interpolation (which poses parsing risks with characters like backslashes), the app caches the current table view in a local state variable (`currentExpenses`) to populate the edit form. While effective for a lightweight app, a production-scale SPA would require a robust state manager (like Redux/Vuex) or isolated API fetches by ID.
+* **Date Processing:** Dates are handled as raw `YYYY-MM-DD` strings. There is no complex timezone normalization, which is sufficient for a localized personal tool but would require an overhaul for global deployment.
