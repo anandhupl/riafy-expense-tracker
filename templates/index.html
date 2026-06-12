@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Expense Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container py-4">
+    <h2 class="mb-4">Personal Expense Tracker</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card p-3 bg-light border-0 shadow-sm">
+                <h4>Current Month Summary</h4>
+                <h5 class="text-primary">Total Spent: ₹<span id="summary-total">0.00</span></h5>
+                <ul id="summary-breakdown" class="mb-0 text-muted"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card p-3 shadow-sm border-0">
+                <h4 id="form-title">Add Expense</h4>
+                <form id="expense-form">
+                    <input type="hidden" id="exp-id">
+                    <div class="mb-2"><input type="text" id="exp-title" class="form-control" placeholder="Title (e.g. Coffee at Starbucks)" required></div>
+                    <div class="mb-2"><input type="number" id="exp-amount" class="form-control" step="0.01" min="0.01" placeholder="Amount (₹)" required></div>
+                    <div class="mb-2">
+                        <select id="exp-category" class="form-control" required>
+                            <option value="">Select Category...</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-2"><input type="date" id="exp-date" class="form-control" required></div>
+                    <div class="mb-2"><textarea id="exp-note" class="form-control" placeholder="Note (Optional)" rows="2"></textarea></div>
+                    <button type="submit" class="btn btn-primary w-100" id="save-btn">Add Expense</button>
+                    <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancel-btn" onclick="resetForm()">Cancel Edit</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card p-3 shadow-sm border-0">
+                <h4>Expenses</h4>
+                <div class="row mb-3 g-2">
+                    <div class="col-sm-3"><input type="text" id="filter-search" class="form-control form-control-sm" placeholder="Search Title..." onkeyup="loadExpenses()"></div>
+                    <div class="col-sm-3">
+                        <select id="filter-category" class="form-control form-control-sm" onchange="loadExpenses()">
+                            <option value="">All Categories</option>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Shopping">Shopping</option>
+                            <option value="Bills">Bills</option>
+                            <option value="Entertainment">Entertainment</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">From</span>
+                            <input type="date" id="filter-start" class="form-control" onchange="loadExpenses()">
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">To</span>
+                            <input type="date" id="filter-end" class="form-control" onchange="loadExpenses()">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr><th>Date</th><th>Title</th><th>Category</th><th>Amount (₹)</th><th>Note</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="expense-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        document.getElementById('exp-date').valueAsDate = new Date();
+
+        // XSS Sanitization Helper
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, function(match) {
+                const escape = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                };
+                return escape[match];
+            });
+        }
+
+        async function loadSummary() {
+            const res = await fetch(`${API_URL}/summary`);
+            const data = await res.json();
+            document.getElementById('summary-total').innerText = (data.total || 0).toFixed(2);
+            document.getElementById('summary-breakdown').innerHTML = data.breakdown.length ? 
+                data.breakdown.map(b => `<li><strong>${escapeHTML(b.category)}:</strong> ₹${b.total.toFixed(2)}</li>`).join('') :
+                '<li>No expenses this month.</li>';
+        }
+
+        async function loadExpenses() {
+            let start = document.getElementById('filter-start').value;
+            let end = document.getElementById('filter-end').value;
+
+            // The Logic Patch: Prevent paradoxical time travel
+            if (start && end && start > end) {
+                alert("Logic Error: Start date cannot be after the End date.");
+                document.getElementById('filter-end').value = ''; // Clear the invalid input
+                end = ''; // Reset for the API call
+            }
+
+            const params = new URLSearchParams({
+                search: document.getElementById('filter-search').value,
+                category: document.getElementById('filter-category').value,
+                start_date: start,
+                end_date: end,
+            });
+            const res = await fetch(`${API_URL}/expenses?${params}`);
+            const expenses = await res.json();
+            
+            const tbody = document.getElementById('expense-list');
+            if(expenses.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No expenses found.</td></tr>';
+            } else {
+                tbody.innerHTML = expenses.map(e => `
+                    <tr>
+                        <td class="text-nowrap">${e.date}</td>
+                        <td class="text-break">${escapeHTML(e.title)}</td>
+                        <td><span class="badge bg-secondary">${escapeHTML(e.category)}</span></td>
+                        <td><strong>₹${e.amount.toFixed(2)}</strong></td>
+                        <td class="text-muted small text-break">${escapeHTML(e.note) || '-'}</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="editExp(${e.id}, '${escapeHTML(e.title).replace(/'/g, "\\'")}', ${e.amount}, '${escapeHTML(e.category)}', '${e.date}', '${escapeHTML(e.note || '').replace(/'/g, "\\'")}')">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteExp(${e.id})">Del</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+            loadSummary();
+        }
+
+        document.getElementById('expense-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('exp-id').value;
+            const payload = {
+                title: document.getElementById('exp-title').value,
+                amount: document.getElementById('exp-amount').value,
+                category: document.getElementById('exp-category').value,
+                date: document.getElementById('exp-date').value,
+                note: document.getElementById('exp-note').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${API_URL}/expenses/${id}` : `${API_URL}/expenses`;
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                alert(`Error: ${errorData.error}`);
+                return; 
+            }
+            
+            resetForm();
+            loadExpenses();
+        };
+
+        function editExp(id, title, amount, category, date, note) {
+            document.getElementById('exp-id').value = id;
+            
+            const decodeHTML = (html) => {
+                const txt = document.createElement('textarea');
+                txt.innerHTML = html;
+                return txt.value;
+            };
+
+            document.getElementById('exp-title').value = decodeHTML(title);
+            document.getElementById('exp-amount').value = amount;
+            document.getElementById('exp-category').value = decodeHTML(category);
+            document.getElementById('exp-date').value = date;
+            document.getElementById('exp-note').value = decodeHTML(note);
+            
+            document.getElementById('form-title').innerText = 'Edit Expense';
+            document.getElementById('save-btn').innerText = 'Update Expense';
+            document.getElementById('cancel-btn').classList.remove('d-none');
+        }
+
+        function resetForm() {
+            document.getElementById('expense-form').reset();
+            document.getElementById('exp-id').value = '';
+            document.getElementById('exp-date').valueAsDate = new Date();
+            document.getElementById('form-title').innerText = 'Add Expense';
+            document.getElementById('save-btn').innerText = 'Add Expense';
+            document.getElementById('cancel-btn').classList.add('d-none');
+        }
+
+        async function deleteExp(id) {
+            if(confirm('Delete this expense? This cannot be undone.')) {
+                await fetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
+                loadExpenses();
+            }
+        }
+
+        loadExpenses();
+    </script>
+</body>
+</html>
